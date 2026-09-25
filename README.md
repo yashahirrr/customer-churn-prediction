@@ -1,211 +1,241 @@
-# Customer Churn Prediction App
 
-## 📌 Project Overview
+# Customer Churn Prediction
 
-Customer churn is a critical problem for subscription-based businesses, as retaining existing customers is significantly more cost-effective than acquiring new ones.
+An end-to-end machine learning application that predicts customer churn probability and provides model explanations using SHAP.
 
-This project builds an **end-to-end Machine Learning system** to predict customer churn probability using customer demographics, service usage, and billing data.
-
-The solution goes beyond just modeling and focuses on the **complete ML lifecycle**, including:
-
-- Exploratory Data Analysis (EDA)
-- Feature engineering & preprocessing
-- Model training and comparison
-- Class imbalance handling
-- Threshold optimization
-- Model explainability using SHAP
-- Deployment with Streamlit
-
-Users can input customer information and receive a **real-time churn probability prediction along with model insights**.
-
----
-
-
-## 🚀 Live Demo
+## Live Demo
 
 Coming soon — deployed using Streamlit Community Cloud.
 
----
+## Project Overview
 
-## 📊 Dataset
+Customer churn is an important problem for subscription-based businesses because retaining existing customers can be more cost-effective than acquiring new customers.
 
-This project uses the **Telco Customer Churn Dataset** available on Kaggle.
+This project develops a machine learning system that predicts the probability of customer churn using customer demographics, subscribed services, account information, and billing details.
 
-Dataset Link:  
+The project covers the complete machine learning workflow:
+
+- Exploratory Data Analysis (EDA)
+- Data preprocessing
+- Feature engineering
+- Class imbalance handling
+- Model training and comparison
+- Threshold optimization
+- Model evaluation
+- SHAP-based model explainability
+- Interactive Streamlit deployment
+
+The application allows users to enter customer information and receive a churn probability, risk level, and explanation of the prediction.
+
+## Dataset
+
+The project uses the Telco Customer Churn dataset.
+
+Dataset source:
+
 https://www.kaggle.com/datasets/blastchar/telco-customer-churn
 
-- **7043 customer records**
-- **21 features**
+- 7,043 customer records
+- 21 features
+- Binary target variable: `Churn`
 
-### Feature Categories:
+### Feature Categories
 
-- Customer demographics (gender, partner, dependents, senior citizen)
-- Account information (tenure, contract type, billing method)
-- Services subscribed (internet, streaming, security, tech support)
-- Billing information (monthly charges, total charges)
-- Target variable: **Churn**
-
-The goal is to build models that **predict customer churn probability** and enable data-driven retention strategies.
-
----
-
-## 🛠 Tech Stack
-
-- Python
-- Pandas, NumPy
-- Scikit-learn
-- XGBoost
-- SHAP
-- Matplotlib
-- Streamlit
-- Joblib
-
----
-
-## ⚙️ Machine Learning Pipeline
-
-### 🔹 Numerical Features
-
-- Tenure  
-- MonthlyCharges  
-- TotalCharges  
-
-Processing:
-- Missing value imputation
-- Standard scaling
-
----
-
-### 🔹 Categorical Features
+**Customer Demographics**
 
 - Gender
-- Contract type
-- Internet service
-- Payment method
-- Service-related features
+- Senior Citizen
+- Partner
+- Dependents
+
+**Account Information**
+
+- Tenure
+- Contract
+- Paperless Billing
+- Payment Method
+
+**Services**
+
+- Phone Service
+- Multiple Lines
+- Internet Service
+- Online Security
+- Online Backup
+- Device Protection
+- Tech Support
+- Streaming TV
+- Streaming Movies
+
+**Billing**
+
+- Monthly Charges
+- Total Charges
+
+## Machine Learning Pipeline
+
+The preprocessing pipeline is implemented using Scikit-learn's `ColumnTransformer`.
+
+### Numerical Features
+
+- Tenure
+- Monthly Charges
+- Total Charges
 
 Processing:
-- Missing value imputation
+
+- Missing value imputation using the median
+- Standard scaling using `StandardScaler`
+
+### Categorical Features
+
+Categorical features are processed using:
+
+- Most-frequent-value imputation
 - One-hot encoding
+- `handle_unknown='ignore'`
 
----
+The preprocessing steps are integrated into the model pipelines so that the same transformations are applied during both training and prediction.
 
-All preprocessing is handled using a **Scikit-learn ColumnTransformer**, ensuring a clean and reproducible pipeline.
+## Models
 
----
+Three classification models are trained and compared.
 
-## 🤖 Models Used
+### Logistic Regression
 
-### 🔹 Logistic Regression
-- Baseline interpretable model  
-- High recall → good at identifying churn customers  
+Used as an interpretable baseline model with class-balanced training.
 
----
+### Random Forest
 
-### 🔹 Random Forest
-- Ensemble model  
-- Captures non-linear relationships  
-- Balanced performance across metrics  
+An ensemble model capable of capturing non-linear relationships between customer characteristics and churn.
 
----
+Configuration includes class-balanced training and 200 trees.
 
-### 🔹 XGBoost
-- Gradient boosting model  
-- Handles class imbalance using `scale_pos_weight`  
-- Strong performance with optimized learning and regularization  
+### XGBoost
 
----
+A gradient boosting model configured with:
 
-## 📈 Model Performance
+- 200 estimators
+- Learning rate of 0.05
+- Maximum depth of 4
+- Subsampling
+- Feature subsampling
+- `scale_pos_weight` for class imbalance
+- Log-loss evaluation metric
 
-| Model | ROC-AUC | F1 Score | Precision | Recall |
-|------|--------|--------|--------|--------|
-| Logistic Regression | 0.86 | 0.64 | 0.52 | 0.84 |
-| Random Forest | 0.85 | 0.65 | 0.56 | 0.78 |
-| XGBoost | 0.85 | 0.63 | 0.55 | 0.75 |
+## Model Performance
 
----
+The deployed application evaluates the models using the saved test dataset.
 
-## ⚖️ Threshold Optimization
+| Model               | ROC-AUC | F1 Score | Precision | Recall |
+| ------------------- | ------: | -------: | --------: | -----: |
+| Logistic Regression |    0.84 |     0.62 |      0.51 |   0.79 |
+| Random Forest       |    0.89 |     0.69 |      0.60 |   0.80 |
+| XGBoost             |    0.88 |     0.67 |      0.56 |   0.84 |
 
-Instead of using a default threshold (0.5), different thresholds were evaluated to balance:
+The application provides additional evaluation through:
 
-- Precision (avoiding false positives)
-- Recall (capturing churn customers)
+- ROC curves
+- Confusion matrices
+- Model comparison
+- Feature importance
 
-This allows businesses to **customize risk tolerance based on strategy**.
+## Threshold Optimization
 
----
+The project evaluates classification thresholds beyond the default 0.5 threshold.
 
-## 🔍 Model Explainability (SHAP)
+Changing the threshold allows the trade-off between precision and recall to be adjusted depending on the desired business strategy.
 
-To make the model interpretable, **SHAP (SHapley Additive Explanations)** was used:
+For churn prediction, this can be useful when the cost of missing a potential churn customer differs from the cost of contacting a customer who ultimately does not churn.
 
-- Explains **individual predictions**
-- Identifies **global feature importance**
-- Helps understand **why a customer is likely to churn**
+## Model Explainability
 
-### Key Insights from SHAP:
+The application uses SHAP (SHapley Additive exPlanations) to provide model explanations.
 
-- 📉 Low tenure → higher churn risk  
-- 📉 Month-to-month contracts → strong churn driver  
-- 📈 Higher monthly charges → increased churn probability  
-- ❌ Lack of services (security, tech support) → higher churn  
+SHAP is used for:
 
----
+- Individual prediction explanations
+- Global feature importance
+- Understanding which features contribute to predictions
 
-## 📊 Key Insights
+The Streamlit application displays SHAP explanations for individual customer predictions as well as global SHAP visualizations.
 
-### 📌 Contract Type
-Customers on **month-to-month contracts** show the highest churn probability.
+### Model-Identified Churn Drivers
 
-### 📌 Customer Tenure
-Customers with shorter tenure are significantly more likely to churn.
+The model identifies several features as important predictors of churn, including:
 
-### 📌 Monthly Charges
-Higher monthly charges correlate with increased churn.
+- Customer tenure
+- Contract type
+- Monthly charges
+- Internet service
+- Value-added services such as Online Security and Tech Support
 
-### 📌 Internet Service Type
-Customers with **fiber optic service** have higher churn rates.
+These should be interpreted as model associations rather than causal relationships.
 
-### 📌 Value-added Services
-Customers without:
-- Online Security  
-- Tech Support  
-- Device Protection  
+## Business Insights
 
-are more likely to churn.
+The model can help identify customer segments associated with higher predicted churn risk.
 
----
+Examples of potential retention strategies include:
 
-## 💡 Business Recommendations
+- Targeting customers with high predicted churn probability
+- Focusing attention on newer customers
+- Evaluating customers on month-to-month contracts
+- Reviewing customers with relatively high monthly charges
+- Considering service bundles and retention offers
 
-Based on the model insights:
+These recommendations are intended as examples of how model predictions could support business decision-making.
 
-- Encourage **long-term contracts** via incentives  
-- Offer **bundled services** to improve retention  
-- Provide **targeted offers to high-paying customers**  
-- Focus retention strategies on **new customers with low tenure**  
+## Streamlit Application
 
----
+The application provides two main sections.
 
-## 🌐 Deployment
+### Prediction
 
-The model is deployed using **Streamlit**, allowing users to:
+Users can:
 
-- Input customer data  
-- Get churn probability instantly  
-- View model explanations using SHAP  
+- Select a machine learning model
+- Enter customer information
+- Generate churn probability
+- View the predicted risk level
+- View the model used
+- Inspect the SHAP explanation for the prediction
 
----
+### Model Insights
 
-## 📌 Conclusion
+Users can explore:
 
-This project demonstrates how to build a **production-ready ML solution** that combines:
+- Model performance
+- ROC curves
+- Confusion matrices
+- Model comparison
+- Feature importance
+- SHAP summary plots
+- SHAP feature importance
+- Business insights
 
-- Predictive modeling  
-- Business understanding  
-- Explainability  
-- Deployment  
+## Project Structure
 
-It highlights the importance of going beyond modeling to deliver **actionable business insights**.
+```text
+Customer-Churn-Prediction/
+│
+├── app/
+│   └── app.py
+│
+├── data/
+│   ├── Telco_Customer_Churn.csv
+│   ├── X_test.csv
+│   └── y_test.csv
+│
+├── models/
+│   ├── logistic_model.pkl
+│   ├── rf_model.pkl
+│   └── xgb_model.pkl
+│
+├── notebooks/
+│   └── Customer_Churn_Prediction.ipynb
+│
+├── .gitignore
+├── README.md
+└── requirements.txt
+```
