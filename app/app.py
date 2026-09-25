@@ -3,11 +3,20 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from joblib import load
+from sklearn.metrics import roc_curve
+from pathlib import Path
 import shap
 
+from sklearn.metrics import (
+    roc_auc_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_curve,
+    confusion_matrix
+)
 
-from pathlib import Path
-from joblib import load
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -15,11 +24,15 @@ logistic_model = load(BASE_DIR / "models" / "logistic_model.pkl")
 rf_model = load(BASE_DIR / "models" / "rf_model.pkl")
 xgb_model = load(BASE_DIR / "models" / "xgb_model.pkl")
 
+DATA_PATH = BASE_DIR / "data" / "Telco_Customer_Churn.csv"
+churn_data = pd.read_csv(DATA_PATH)
+X_test = pd.read_csv(
+    BASE_DIR / "data" / "X_test.csv"
+)
 
-
-# logistic_model = load("models/logistic_model.pkl")
-# rf_model = load("models/rf_model.pkl")
-# xgb_model = load("models/xgb_model.pkl")
+y_test = pd.read_csv(
+    BASE_DIR / "data" / "y_test.csv"
+).squeeze()
 
 tab1, tab2 = st.tabs(["Prediction", "Model Insights"])
 preprocessor = rf_model.named_steps["preprocessor"]
@@ -92,13 +105,13 @@ with tab1:
     "TotalCharges":[total]
     })
 
-    X_transformed = preprocessor.transform(data)
-    feature_names = preprocessor.get_feature_names_out()
-    X_transformed_df = pd.DataFrame(
-        X_transformed,
-        columns=feature_names
-    )
-    explainer = shap.TreeExplainer(rf_classifier)
+    # X_transformed = preprocessor.transform(data)
+    # feature_names = preprocessor.get_feature_names_out()
+    # X_transformed_df = pd.DataFrame(
+    #     X_transformed,
+    #     columns=feature_names
+    # )
+
 
 
     if model_choice == "Logistic Regression":
@@ -123,19 +136,113 @@ with tab1:
             st.success("Low Risk Customer")
         st.write(f"Model Used: **{model_choice}**")
         st.subheader("Prediction Explanation (SHAP)")
+        selected_preprocessor = model.named_steps["preprocessor"]
 
-        X_transformed = preprocessor.transform(data)
+        if model_choice == "Logistic Regression":
+            selected_classifier = model.named_steps["classifier"]
+        else:
+            selected_classifier = model.named_steps["model"]
 
-        explainer = shap.Explainer(rf_classifier)
-        shap_values = explainer(X_transformed_df)
+        X_transformed = selected_preprocessor.transform(data)
 
-        fig = plt.figure()
+        feature_names = selected_preprocessor.get_feature_names_out()
+
+        X_transformed_df = pd.DataFrame(
+            X_transformed,
+            columns=feature_names
+        )
+
+# Create model-specific SHAP explainer
+        if model_choice == "Logistic Regression":
+
+            # Use real customers from the Telco dataset as the SHAP background
+            background_data = churn_data.drop(
+                columns=["Churn", "customerID"],
+                errors="ignore"
+            ).sample(
+                n=min(300, len(churn_data)),
+                random_state=42
+            )
+
+            # Apply the same preprocessing used during model training
+            X_background = selected_preprocessor.transform(background_data)
+
+            X_background_df = pd.DataFrame(
+                X_background,
+                columns=feature_names
+            )
+
+            # Create SHAP explainer using real customer data as background
+            explainer = shap.LinearExplainer(
+                selected_classifier,
+                X_background_df
+            )
+
+            # Explain the currently entered customer
+            shap_values = explainer(X_transformed_df)
+
+            explanation = shap.Explanation(
+                values=shap_values.values[0],
+                base_values=shap_values.base_values[0],
+                data=X_transformed_df.iloc[0].values,
+                feature_names=feature_names
+            )
+
+        elif model_choice in ["Random Forest", "XGBoost"]:
+
+            explainer = shap.TreeExplainer(
+                selected_classifier
+            )
+
+            shap_values = explainer(X_transformed_df)
+
+            # SHAP 0.52 returns either:
+            # (samples, features)
+            # or (samples, features, classes)
+            if len(shap_values.values.shape) == 3:
+
+                explanation = shap.Explanation(
+                    values=shap_values.values[0, :, 1],
+                    base_values=shap_values.base_values[0, 1],
+                    data=X_transformed_df.iloc[0].values,
+                    feature_names=feature_names
+                )
+
+            else:
+
+                # XGBoost in your environment returns this format:
+                # (1, 46)
+                explanation = shap_values[0]
+
+        fig, ax = plt.subplots(figsize=(10, 6))
 
         shap.plots.waterfall(
-            shap_values[0, :, 1],
+            explanation,
+            max_display=12,
             show=False
         )
+
         st.pyplot(fig)
+
+        plt.close(fig)
+
+        
+
+
+# st.subheader("Prediction Explanation (SHAP)")
+
+# X_transformed = preprocessor.transform(data)
+
+# explainer = shap.Explainer(rf_classifier)
+# shap_values = explainer(X_transformed_df)
+
+# fig = plt.figure()
+
+# shap.plots.waterfall(
+#     shap_values[0, :, 1],
+#     show=False
+# )
+# st.pyplot(fig)
 
 with tab2:
     preprocessor = rf_model.named_steps["preprocessor"]
@@ -158,11 +265,14 @@ with tab2:
 
     st.subheader("SHAP Summary Plot")
 
-    sample_data = pd.concat([data]*50, ignore_index=True)
-
-    sample_data["tenure"] = np.random.randint(0, 72, size=50)
-    sample_data["MonthlyCharges"] = np.random.uniform(20, 120, size=50)
-    sample_data["TotalCharges"] = np.random.uniform(100, 5000, size=50)
+   # Use real customer records for SHAP analysis
+    sample_data = churn_data.drop(
+        columns=["Churn", "customerID"],
+        errors="ignore"
+    ).sample(
+        n=min(300, len(churn_data)),
+        random_state=42
+    )
 
     X_sample_transformed = preprocessor.transform(sample_data)
     feature_names = preprocessor.get_feature_names_out()
@@ -181,7 +291,7 @@ with tab2:
         show=False
     )
     st.pyplot(fig)
-
+    plt.close(fig)
     st.subheader("SHAP Feature Importance")
 
     fig = plt.figure()
@@ -191,17 +301,152 @@ with tab2:
         show=False
     )
     st.pyplot(fig)
+    plt.close(fig)
 
-    performance_df = pd.DataFrame({
-    "Model": ["Logistic Regression", "Random Forest", "XGBoost"],
-    "ROC AUC": [0.86, 0.85, 0.85],
-    "F1 Score": [0.64, 0.65, 0.63],
-    "Precision": [0.52, 0.56, 0.55],
-    "Recall": [0.84, 0.78, 0.75]
-})
+    models = {
+    "Logistic Regression": logistic_model,
+    "Random Forest": rf_model,
+    "XGBoost": xgb_model
+    }
+
+    performance_results = []
+
+    for name, model in models.items():
+
+        y_pred = model.predict(X_test)
+        y_prob = model.predict_proba(X_test)[:, 1]
+
+        performance_results.append({
+            "Model": name,
+            "ROC AUC": round(roc_auc_score(y_test, y_prob), 2),
+            "F1 Score": round(f1_score(y_test, y_pred), 2),
+            "Precision": round(precision_score(y_test, y_pred), 2),
+            "Recall": round(recall_score(y_test, y_pred), 2)
+        })
+
+    performance_df = pd.DataFrame(performance_results)
+    
+
+
+
+
+    
 
     st.subheader("Model Performance")
     st.dataframe(performance_df)
+    st.subheader("ROC Curve")
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    for name, model in models.items():
+
+        y_prob = model.predict_proba(X_test)[:, 1]
+
+        fpr, tpr, _ = roc_curve(y_test, y_prob)
+
+        auc_score = roc_auc_score(y_test, y_prob)
+
+        ax.plot(
+            fpr,
+            tpr,
+            label=f"{name} (AUC = {auc_score:.2f})"
+        )
+
+    ax.plot(
+        [0, 1],
+        [0, 1],
+        linestyle="--",
+        label="Random Classifier"
+    )
+
+    ax.set_xlabel("False Positive Rate")
+    ax.set_ylabel("True Positive Rate")
+    ax.set_title("ROC Curve - Model Comparison")
+    ax.legend()
+    ax.grid(alpha=0.3)
+
+    st.pyplot(fig)
+    plt.close(fig)
+
+
+    st.subheader("Confusion Matrix")
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+
+    for ax, (name, model) in zip(axes, models.items()):
+
+        y_pred = model.predict(X_test)
+
+        cm = confusion_matrix(y_test, y_pred)
+
+        ax.imshow(cm)
+
+        ax.set_title(name)
+        ax.set_xlabel("Predicted")
+        ax.set_ylabel("Actual")
+
+        ax.set_xticks([0, 1])
+        ax.set_yticks([0, 1])
+
+        ax.set_xticklabels(["No Churn", "Churn"])
+        ax.set_yticklabels(["No Churn", "Churn"])
+
+        for i in range(2):
+            for j in range(2):
+                ax.text(
+                    j,
+                    i,
+                    cm[i, j],
+                    ha="center",
+                    va="center"
+                )
+
+    plt.tight_layout()
+
+    st.pyplot(fig)
+    plt.close(fig)
+
+
+    st.subheader("Model Comparison")
+
+    comparison_df = performance_df.set_index("Model")[
+        ["ROC AUC", "F1 Score", "Precision", "Recall"]
+    ]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    comparison_df.plot(
+        kind="bar",
+        ax=ax
+    )
+
+    ax.set_title("Model Performance Comparison")
+    ax.set_ylabel("Score")
+    ax.set_xlabel("Model")
+    ax.set_ylim(0, 1)
+
+    ax.legend(title="Metric")
+    ax.grid(axis="y", alpha=0.3)
+
+    plt.xticks(rotation=0)
+    plt.tight_layout()
+
+    st.pyplot(fig)
+    plt.close(fig)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     st.subheader("Business Insights")
     st.markdown("""
@@ -236,3 +481,9 @@ Based on the model analysis and feature importance results, several factors sign
 • Provide **special retention offers for high-charge customers** to reduce churn risk.  
 • Focus retention campaigns on **new customers with low tenure**.
 """)
+
+
+
+
+
+# this is the nw file 
