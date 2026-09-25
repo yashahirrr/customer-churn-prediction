@@ -1,9 +1,7 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 from joblib import load
-from sklearn.metrics import roc_curve
 from pathlib import Path
 import shap
 
@@ -17,6 +15,10 @@ from sklearn.metrics import (
 )
 
 
+st.set_page_config(
+    page_title="Customer Churn Prediction",
+    layout="wide"
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -35,84 +37,74 @@ y_test = pd.read_csv(
 ).squeeze()
 
 tab1, tab2 = st.tabs(["Prediction", "Model Insights"])
-preprocessor = rf_model.named_steps["preprocessor"]
-rf_classifier = rf_model.named_steps["model"]
 
 with tab1:
-
-    st.title("Customer Churn Prediction App")
-
+    st.title("Customer Churn Prediction")
     st.write("Enter customer details to predict churn probability")
-
 
     model_choice = st.selectbox(
         "Choose Model",
         ["Logistic Regression", "Random Forest", "XGBoost"]
     )
 
+    st.subheader("Customer Information")
+    col1, col2 = st.columns(2)
+    with col1:
+        gender = st.selectbox("Gender", ["Male", "Female"])
+        senior = st.selectbox("Senior Citizen", [0, 1])
+        partner = st.selectbox("Partner", ["Yes", "No"])
+    with col2:
+        dependents = st.selectbox("Dependents", ["Yes", "No"])
+        tenure = st.slider("Tenure (months)", 0, 72)
 
-    gender = st.selectbox("Gender", ["Male","Female"])
-    senior = st.selectbox("Senior Citizen", [0,1])
-    partner = st.selectbox("Partner", ["Yes","No"])
-    dependents = st.selectbox("Dependents", ["Yes","No"])
+    st.subheader("Services")
+    col1, col2 = st.columns(2)
+    with col1:
+        phoneservice = st.selectbox("Phone Service", ["Yes", "No"])
+        multiplelines = st.selectbox("Multiple Lines", ["Yes", "No", "No phone service"])
+        internet = st.selectbox("Internet Service", ["DSL", "Fiber optic", "No"])
+        onlinesecurity = st.selectbox("Online Security", ["Yes", "No", "No internet service"])
+        onlinebackup = st.selectbox("Online Backup", ["Yes", "No", "No internet service"])
+    with col2:
+        deviceprotection = st.selectbox("Device Protection", ["Yes", "No", "No internet service"])
+        techsupport = st.selectbox("Tech Support", ["Yes", "No", "No internet service"])
+        streamingtv = st.selectbox("Streaming TV", ["Yes", "No", "No internet service"])
+        streamingmovies = st.selectbox("Streaming Movies", ["Yes", "No", "No internet service"])
 
-    tenure = st.slider("Tenure (months)",0,72)
-
-    phoneservice = st.selectbox("Phone Service", ["Yes","No"])
-    multiplelines = st.selectbox("Multiple Lines", ["Yes","No","No phone service"])
-
-    internet = st.selectbox("Internet Service", ["DSL","Fiber optic","No"])
-
-    onlinesecurity = st.selectbox("Online Security", ["Yes","No","No internet service"])
-    onlinebackup = st.selectbox("Online Backup", ["Yes","No","No internet service"])
-    deviceprotection = st.selectbox("Device Protection", ["Yes","No","No internet service"])
-    techsupport = st.selectbox("Tech Support", ["Yes","No","No internet service"])
-
-    streamingtv = st.selectbox("Streaming TV", ["Yes","No","No internet service"])
-    streamingmovies = st.selectbox("Streaming Movies", ["Yes","No","No internet service"])
-
-    contract = st.selectbox("Contract", ["Month-to-month","One year","Two year"])
-    paperless = st.selectbox("Paperless Billing", ["Yes","No"])
-
-    payment = st.selectbox(
-        "Payment Method",
-        ["Electronic check","Mailed check","Bank transfer (automatic)","Credit card (automatic)"]
-    )
-
-    monthly = st.number_input("Monthly Charges",0.0,200.0)
-    total = st.number_input("Total Charges",0.0,10000.0)
-
+    st.subheader("Billing & Contract")
+    col1, col2 = st.columns(2)
+    with col1:
+        contract = st.selectbox("Contract", ["Month-to-month", "One year", "Two year"])
+        paperless = st.selectbox("Paperless Billing", ["Yes", "No"])
+        payment = st.selectbox(
+            "Payment Method",
+            ["Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"]
+        )
+    with col2:
+        monthly = st.number_input("Monthly Charges", 0.0, 200.0)
+        total = st.number_input("Total Charges", 0.0, 10000.0)
 
     data = pd.DataFrame({
-    "gender":[gender],
-    "SeniorCitizen":[senior],
-    "Partner":[partner],
-    "Dependents":[dependents],
-    "tenure":[tenure],
-    "PhoneService":[phoneservice],
-    "MultipleLines":[multiplelines],
-    "InternetService":[internet],
-    "OnlineSecurity":[onlinesecurity],
-    "OnlineBackup":[onlinebackup],
-    "DeviceProtection":[deviceprotection],
-    "TechSupport":[techsupport],
-    "StreamingTV":[streamingtv],
-    "StreamingMovies":[streamingmovies],
-    "Contract":[contract],
-    "PaperlessBilling":[paperless],
-    "PaymentMethod":[payment],
-    "MonthlyCharges":[monthly],
-    "TotalCharges":[total]
+        "gender": [gender],
+        "SeniorCitizen": [senior],
+        "Partner": [partner],
+        "Dependents": [dependents],
+        "tenure": [tenure],
+        "PhoneService": [phoneservice],
+        "MultipleLines": [multiplelines],
+        "InternetService": [internet],
+        "OnlineSecurity": [onlinesecurity],
+        "OnlineBackup": [onlinebackup],
+        "DeviceProtection": [deviceprotection],
+        "TechSupport": [techsupport],
+        "StreamingTV": [streamingtv],
+        "StreamingMovies": [streamingmovies],
+        "Contract": [contract],
+        "PaperlessBilling": [paperless],
+        "PaymentMethod": [payment],
+        "MonthlyCharges": [monthly],
+        "TotalCharges": [total]
     })
-
-    # X_transformed = preprocessor.transform(data)
-    # feature_names = preprocessor.get_feature_names_out()
-    # X_transformed_df = pd.DataFrame(
-    #     X_transformed,
-    #     columns=feature_names
-    # )
-
-
 
     if model_choice == "Logistic Regression":
         model = logistic_model
@@ -121,11 +113,18 @@ with tab1:
     else:
         model = xgb_model
 
-    if st.button("Predict Churn"):
+    if st.button(
+        "Predict Churn",
+        use_container_width=True
+    ):
+        st.subheader("Prediction Result")
 
         prob = model.predict_proba(data)[0][1]
 
-        st.metric("Churn Probability", f"{prob*100:.1f}%")
+        st.metric(
+            "Churn Probability",
+            f"{prob*100:.1f}%"
+        )
         st.progress(float(prob))
 
         if prob > 0.6:
@@ -134,8 +133,15 @@ with tab1:
             st.warning("Medium Risk Customer")
         else:
             st.success("Low Risk Customer")
+
         st.write(f"Model Used: **{model_choice}**")
-        st.subheader("Prediction Explanation (SHAP)")
+
+        st.subheader("Why did the model make this prediction?")
+        st.write(
+            "The chart below shows which customer characteristics "
+            "influenced the predicted churn probability."
+        )
+
         selected_preprocessor = model.named_steps["preprocessor"]
 
         if model_choice == "Logistic Regression":
@@ -152,9 +158,8 @@ with tab1:
             columns=feature_names
         )
 
-# Create model-specific SHAP explainer
+        # Create model-specific SHAP explainer
         if model_choice == "Logistic Regression":
-
             # Use real customers from the Telco dataset as the SHAP background
             background_data = churn_data.drop(
                 columns=["Churn", "customerID"],
@@ -189,7 +194,6 @@ with tab1:
             )
 
         elif model_choice in ["Random Forest", "XGBoost"]:
-
             explainer = shap.TreeExplainer(
                 selected_classifier
             )
@@ -200,16 +204,13 @@ with tab1:
             # (samples, features)
             # or (samples, features, classes)
             if len(shap_values.values.shape) == 3:
-
                 explanation = shap.Explanation(
                     values=shap_values.values[0, :, 1],
                     base_values=shap_values.base_values[0, 1],
                     data=X_transformed_df.iloc[0].values,
                     feature_names=feature_names
                 )
-
             else:
-
                 # XGBoost in your environment returns this format:
                 # (1, 46)
                 explanation = shap_values[0]
@@ -223,96 +224,20 @@ with tab1:
         )
 
         st.pyplot(fig)
-
         plt.close(fig)
 
-        
-
-
-# st.subheader("Prediction Explanation (SHAP)")
-
-# X_transformed = preprocessor.transform(data)
-
-# explainer = shap.Explainer(rf_classifier)
-# shap_values = explainer(X_transformed_df)
-
-# fig = plt.figure()
-
-# shap.plots.waterfall(
-#     shap_values[0, :, 1],
-#     show=False
-# )
-# st.pyplot(fig)
-
 with tab2:
-    preprocessor = rf_model.named_steps["preprocessor"]
-    feature_names = preprocessor.get_feature_names_out()
-
-    rf_classifier = rf_model.named_steps["model"]
-    feature_importance = rf_classifier.feature_importances_
-
-    feat_imp = pd.DataFrame({
-        "feature": feature_names,
-        "importance": feature_importance
-    }).sort_values("importance", ascending=False)
-
-    top_features = feat_imp.head(15)
-    fig, ax = plt.subplots(figsize=(10,6))
-    ax.barh(top_features["feature"], top_features["importance"])
-    ax.invert_yaxis()
-    ax.set_title("Top Drivers of Customer Churn")
-    st.pyplot(fig)
-
-    st.subheader("SHAP Summary Plot")
-
-   # Use real customer records for SHAP analysis
-    sample_data = churn_data.drop(
-        columns=["Churn", "customerID"],
-        errors="ignore"
-    ).sample(
-        n=min(300, len(churn_data)),
-        random_state=42
-    )
-
-    X_sample_transformed = preprocessor.transform(sample_data)
-    feature_names = preprocessor.get_feature_names_out()
-
-    X_sample_df = pd.DataFrame(
-        X_sample_transformed,
-        columns=feature_names
-    )
-    explainer = shap.Explainer(rf_classifier)
-    shap_values = explainer(X_sample_df)
-
-    fig = plt.figure()
-    shap.plots.beeswarm(
-        shap_values[:, :, 1],
-        max_display=15,
-        show=False
-    )
-    st.pyplot(fig)
-    plt.close(fig)
-    st.subheader("SHAP Feature Importance")
-
-    fig = plt.figure()
-    shap.plots.bar(
-        shap_values[:, :, 1],
-        max_display=15,
-        show=False
-    )
-    st.pyplot(fig)
-    plt.close(fig)
+    st.header("Model Evaluation")
 
     models = {
-    "Logistic Regression": logistic_model,
-    "Random Forest": rf_model,
-    "XGBoost": xgb_model
+        "Logistic Regression": logistic_model,
+        "Random Forest": rf_model,
+        "XGBoost": xgb_model
     }
 
     performance_results = []
 
     for name, model in models.items():
-
         y_pred = model.predict(X_test)
         y_prob = model.predict_proba(X_test)[:, 1]
 
@@ -325,25 +250,17 @@ with tab2:
         })
 
     performance_df = pd.DataFrame(performance_results)
-    
-
-
-
-
-    
 
     st.subheader("Model Performance")
     st.dataframe(performance_df)
+
     st.subheader("ROC Curve")
 
     fig, ax = plt.subplots(figsize=(8, 6))
 
     for name, model in models.items():
-
         y_prob = model.predict_proba(X_test)[:, 1]
-
         fpr, tpr, _ = roc_curve(y_test, y_prob)
-
         auc_score = roc_auc_score(y_test, y_prob)
 
         ax.plot(
@@ -364,30 +281,25 @@ with tab2:
     ax.set_title("ROC Curve - Model Comparison")
     ax.legend()
     ax.grid(alpha=0.3)
+    plt.tight_layout()
 
     st.pyplot(fig)
     plt.close(fig)
-
 
     st.subheader("Confusion Matrix")
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
 
     for ax, (name, model) in zip(axes, models.items()):
-
         y_pred = model.predict(X_test)
-
         cm = confusion_matrix(y_test, y_pred)
 
         ax.imshow(cm)
-
         ax.set_title(name)
         ax.set_xlabel("Predicted")
         ax.set_ylabel("Actual")
-
         ax.set_xticks([0, 1])
         ax.set_yticks([0, 1])
-
         ax.set_xticklabels(["No Churn", "Churn"])
         ax.set_yticklabels(["No Churn", "Churn"])
 
@@ -402,10 +314,8 @@ with tab2:
                 )
 
     plt.tight_layout()
-
     st.pyplot(fig)
     plt.close(fig)
-
 
     st.subheader("Model Comparison")
 
@@ -424,52 +334,100 @@ with tab2:
     ax.set_ylabel("Score")
     ax.set_xlabel("Model")
     ax.set_ylim(0, 1)
-
     ax.legend(title="Metric")
     ax.grid(axis="y", alpha=0.3)
-
     plt.xticks(rotation=0)
     plt.tight_layout()
 
     st.pyplot(fig)
     plt.close(fig)
 
+    st.header("Model Explainability")
 
+    st.subheader("Feature Importance")
 
+    preprocessor = rf_model.named_steps["preprocessor"]
+    feature_names = preprocessor.get_feature_names_out()
 
+    rf_classifier = rf_model.named_steps["model"]
+    feature_importance = rf_classifier.feature_importances_
 
+    feat_imp = pd.DataFrame({
+        "feature": feature_names,
+        "importance": feature_importance
+    }).sort_values("importance", ascending=False)
 
+    top_features = feat_imp.head(15)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.barh(top_features["feature"], top_features["importance"])
+    ax.invert_yaxis()
+    ax.set_title("Top Drivers of Customer Churn")
+    plt.tight_layout()
+    st.pyplot(fig)
+    plt.close(fig)
 
+    st.subheader("SHAP Summary Plot")
 
+    # Use real customer records for SHAP analysis
+    sample_data = churn_data.drop(
+        columns=["Churn", "customerID"],
+        errors="ignore"
+    ).sample(
+        n=min(300, len(churn_data)),
+        random_state=42
+    )
 
+    X_sample_transformed = preprocessor.transform(sample_data)
 
+    X_sample_df = pd.DataFrame(
+        X_sample_transformed,
+        columns=feature_names
+    )
+    explainer = shap.Explainer(rf_classifier)
+    shap_values = explainer(X_sample_df)
 
+    fig = plt.figure()
+    shap.plots.beeswarm(
+        shap_values[:, :, 1],
+        max_display=15,
+        show=False
+    )
+    st.pyplot(fig)
+    plt.close(fig)
 
+    st.subheader("SHAP Feature Importance")
 
+    fig = plt.figure()
+    shap.plots.bar(
+        shap_values[:, :, 1],
+        max_display=15,
+        show=False
+    )
+    st.pyplot(fig)
+    plt.close(fig)
 
-
-    st.subheader("Business Insights")
+    st.header("Business Insights")
     st.markdown("""
 ### Key Drivers of Customer Churn
 
 Based on the model analysis and feature importance results, several factors significantly influence customer churn:
 
-**1️⃣ Customer Tenure**
+**1. Customer Tenure**
 - Customers with shorter tenure are much more likely to churn.
 - New customers have a higher probability of leaving compared to long-term subscribers.
 
-**2️⃣ Contract Type**
+**2. Contract Type**
 - Customers on **month-to-month contracts** show the highest churn risk.
 - Long-term contracts such as **one-year or two-year agreements significantly reduce churn**.
 
-**3️⃣ Monthly Charges**
+**3. Monthly Charges**
 - Higher monthly charges correlate with increased churn probability.
 - Customers paying more are more likely to switch providers if they perceive better value elsewhere.
 
-**4️⃣ Internet Service Type**
+**4. Internet Service Type**
 - Customers using **fiber optic internet services** show relatively higher churn rates compared to DSL users.
 
-**5️⃣ Lack of Value-Added Services**
+**5. Lack of Value-Added Services**
 - Customers without services like **online security, tech support, or device protection** are more likely to churn.
 
 ---
@@ -481,9 +439,3 @@ Based on the model analysis and feature importance results, several factors sign
 • Provide **special retention offers for high-charge customers** to reduce churn risk.  
 • Focus retention campaigns on **new customers with low tenure**.
 """)
-
-
-
-
-
-# this is the nw file 
